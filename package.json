@@ -15,9 +15,13 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "workitems.helloWorld",
-        "title": "Hello World"
+        {
+            "command": "workItems.refreshEntry",
+            "title": "Refresh",
+            "icon": {
+                "light": "resources/light/refresh.svg",
+                "dark": "resources/dark/refresh.svg"
+            }
       }
     ],
     "views": {
@@ -27,7 +31,35 @@
           "name": "Work Items"
         }
       ]
-    }
+    },
+    "menus": {
+        "view/title": [
+            {
+                "command": "workItems.refreshEntry",
+                "when": "view == workItems",
+                "group": "navigation"
+            }
+        ]
+    },
+    "configuration":[
+        {
+            "id": "workItems",
+            "title": "Work Items",
+            "properties": {
+                "workItems.searchLast" :{
+                    "type":"string",
+                    "enum": ["created", "changed"],
+                    "default":"changed",
+                    "description": "fetch the work items changed the last days"
+                },
+                "workItems.count" :{
+                    "type":"number",
+                    "default":101,
+                    "description": "how many days back"
+                }
+            }
+        }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
