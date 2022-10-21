@@ -4,7 +4,7 @@ import * as lim from "azure-devops-node-api/interfaces/LocationsInterfaces";
 import * as vscode from "vscode";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { WorkItemReference } from "azure-devops-node-api/interfaces/TestInterfaces";
-import { WorkItemErrorPolicy } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
+import { WorkItem, WorkItemErrorPolicy } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 
 interface Config {
     token:string
@@ -84,7 +84,17 @@ export async function getWorkItemsFromTfs(wiql:string, top?:number) {
     if(wiqlResults) {
         const ids=wiqlResults.map(r=> Number(r.id));
         const fields = ["System.Id", "System.Title"];
-        const wItems =  await wiApi.getWorkItems(ids,fields);
+        const MAX_ID_LEN=200; 
+        // you can retrieve no more than 200 items at once
+        //https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/get-work-items-batch?view=azure-devops-rest-6.0&tabs=HTTP
+        let wItems : WorkItem[] = [];
+        for (let i = 0; i < ids.length; i+=MAX_ID_LEN) {
+            const e=Math.min(i+MAX_ID_LEN,ids.length);
+            const items=await wiApi.getWorkItems(ids.slice(i,e),fields);
+            if(items) {
+                wItems=wItems.concat(items);
+            }
+        }
         return wItems;
     }
 }
