@@ -3,8 +3,7 @@ import * as GitApi from "azure-devops-node-api/GitApi";
 import * as lim from "azure-devops-node-api/interfaces/LocationsInterfaces";
 import * as vscode from "vscode";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
-import { WorkItemReference } from "azure-devops-node-api/interfaces/TestInterfaces";
-import { WorkItem, WorkItemErrorPolicy } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
+import { WorkItem} from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 
 interface Config {
     token:string
@@ -21,8 +20,7 @@ function getConfig() : Config {
     };
 }
 
-async function getApi(): Promise<az.WebApi> {
-    return new Promise<az.WebApi>(async (resolve, reject) => {
+async function getApi() { 
         try {
             const cfg= await getConfig();
             let authHandler = az.getPersonalAccessTokenHandler(cfg.token);
@@ -56,31 +54,32 @@ async function getApi(): Promise<az.WebApi> {
             if(connData.authenticatedUser) {
                 console.log(`Hello ${connData.authenticatedUser.providerDisplayName}`);
             }
-            resolve(vsts);
+            return vsts;
         }
         catch (err) {
-            reject(err);
+            console.error(err);
+            return null;
         }
-    });
-}
+    
+    }
 
-let webApi: az.WebApi;// await common.getWebApi();
-let gitApi: GitApi.IGitApi;// = await webApi.getGitApi();
-let wiApi:IWorkItemTrackingApi;
-let _apiInitialized=false;
+let webApi: az.WebApi | null = null;
+let gitApi: GitApi.IGitApi;
+let witApi:IWorkItemTrackingApi;
 
 async function ensureApi() {
-    if(!_apiInitialized) {
+    if(!webApi) {
         webApi = await getApi();
-        gitApi = await webApi.getGitApi();
-        wiApi = await webApi.getWorkItemTrackingApi();
-        _apiInitialized=true;
+        if(webApi) {
+            gitApi = await webApi.getGitApi();
+            witApi = await webApi.getWorkItemTrackingApi();
+        }
     }
 }
 
 export async function getWorkItemsFromTfs(wiql:string, top?:number) {
     await ensureApi();
-    const wiqlResults = (await wiApi.queryByWiql({query:wiql},undefined,undefined, top)).workItems;
+    const wiqlResults = (await witApi.queryByWiql({query:wiql},undefined,undefined, top)).workItems;
     if(wiqlResults) {
         const ids=wiqlResults.map(r=> Number(r.id));
         const fields = ["System.Id", "System.Title"];
@@ -90,7 +89,7 @@ export async function getWorkItemsFromTfs(wiql:string, top?:number) {
         let wItems : WorkItem[] = [];
         for (let i = 0; i < ids.length; i+=MAX_ID_LEN) {
             const e=Math.min(i+MAX_ID_LEN,ids.length);
-            const items=await wiApi.getWorkItems(ids.slice(i,e),fields);
+            const items=await witApi.getWorkItems(ids.slice(i,e),fields);
             if(items) {
                 wItems=wItems.concat(items);
             }

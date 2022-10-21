@@ -39,7 +39,11 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
     // }
     refresh(): void {
         this._onDidChangeTreeData.fire();
-      }
+    }
+
+    showSettings():void {
+        vscode.commands.executeCommand("workbench.action.openSettings","workItems");
+    }
 }
 
 export class WorkItemData extends vscode.TreeItem {

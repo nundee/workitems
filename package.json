@@ -18,10 +18,12 @@
         {
             "command": "workItems.refreshEntry",
             "title": "Refresh",
-            "icon": {
-                "light": "resources/light/refresh.svg",
-                "dark": "resources/dark/refresh.svg"
-            }
+            "icon": "$(refresh)"
+      },
+      {
+        "command": "workItems.showSettings",
+        "title": "Show Settings",
+        "icon":"$(settings-gear)"
       }
     ],
     "views": {
@@ -36,6 +38,11 @@
         "view/title": [
             {
                 "command": "workItems.refreshEntry",
+                "when": "view == workItems",
+                "group": "navigation"
+            },
+            {
+                "command": "workItems.showSettings",
                 "when": "view == workItems",
                 "group": "navigation"
             }
