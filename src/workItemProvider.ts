@@ -2,7 +2,11 @@ import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInter
 import * as vscode from 'vscode';
 import {getWorkItemsFromTfs} from './azureClient';
 
+import { getGitApi } from "./gitExtension";
+
 async function getWorkItemData() {
+    //const gitApi = getGitApi();
+    //console.log("repo: "+gitApi?.repositories[0].inputBox.value);
     const vsCfg = vscode.workspace.getConfiguration();
     const cfgField:string = vsCfg.get("workItems.searchLast","changed");
     let col = "[System.ChangedDate]";
