@@ -2,51 +2,16 @@ import * as vscode from 'vscode';
 import {getWorkItemsFromTfs} from './azureClient';
 import { WorkItem } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 import { GitCommit } from "azure-devops-node-api/interfaces/GitInterfaces";
-import { WorkItemModel } from "./model";
+import * as model from "./model";
+import { Commit } from './@types/git';
 
-import { getGitApi } from "./gitExtension";
 
-function currentRepo() {
-    return getGitApi()?.repositories[0];
+async function getWorkItemData() : Promise<WorkItemData[]> {
+    const state = await model.getState();
+    return state.workItems.map(wi=>new WorkItemData(wi,1));
 }
 
 
-async function getWorkItemData() {
-    //const gitApi = getGitApi();
-    //console.log("repo: "+gitApi?.repositories[0].inputBox.value);
-    const vsCfg = vscode.workspace.getConfiguration();
-    const cfgField:string = vsCfg.get("workItems.searchLast","changed");
-    let col = "[System.ChangedDate]";
-    if (cfgField==="created") {
-        col = "[System.CreatedDate]";
-    }
-    const count:number = vsCfg.get<number>("workItems.count",10);
-    const query = `SELECT [System.Id], ${col} FROM WorkItems WHERE ${col} >= @Today-${count} ORDER BY ${col} DESC`;
-    console.log("fetching work items ...");
-    console.log(query);
-    const wItems = await getWorkItemsFromTfs(query);
-    if (!wItems) {return [];}
-    return (wItems as WorkItem[]).map(wi=>new WorkItemData(new WorkItemModel(wi),0));
-}
-
-
-function mentionWorkItem(wiId:number) {
-    let repo=currentRepo();
-    if(repo) {
-        let comment=repo.inputBox.value;
-        const mentionText = `#${wiId}`;
-        const rxRes = /#(\d+)(\s+|$)/g.exec(comment);
-        if(rxRes) {
-            if(Number(rxRes[1].toString()) === wiId) {
-                return;
-            }
-            comment=comment.replace(rxRes[0].toString().trimEnd(),mentionText);
-        } else {
-            comment=comment + " Fix " + mentionText;
-        }
-        repo.inputBox.value = comment;
-    }
-}
 export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
     private _onDidChangeTreeData = new vscode.EventEmitter<WorkItemData | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<WorkItemData | undefined | null | void> = this._onDidChangeTreeData.event;
@@ -60,11 +25,19 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
         }
         if(element.isWorkItem())
         {
-            const wim = element.data as WorkItemModel;
-            if(wim.mentionedIn && wim.mentionedIn.length>0) {
-                return Promise.resolve(
-                    wim.mentionedIn.map(g=>new WorkItemData(g,0))
-                );
+            const wim = element.data as model.WorkItemModel;
+            const wid = wim.id();
+            if(wid) {
+                return (async () => {
+                    if(model.isNullOrEmpty(wim.mentionedIn)) {
+                        wim.mentionedIn = await model.findCommitsMentionedIn(wid);
+                    }
+                    if(!model.isNullOrEmpty(wim.mentionedIn)) {
+                        return wim.mentionedIn.map(g=>new WorkItemData(g,0));
+                    } else {
+                        return [];
+                    }
+                })();
             }
         }
         return Promise.resolve([]);
@@ -76,6 +49,7 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
     //     throw new Error('Method not implemented.');
     // }
     refresh(): void {
+        model.invalidateState();
         this._onDidChangeTreeData.fire();
     }
 
@@ -84,26 +58,26 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
     }
 
     mentionWorkItem(item:any) : void {
-        const wid=(item.data as WorkItemModel).id();
+        const wid=(item.data as model.WorkItemModel).id();
         if(wid) {
-            mentionWorkItem(wid);
+            model.mentionWorkItem(wid);
         }
     }
 }
 
 export class WorkItemData extends vscode.TreeItem {
     constructor(
-        public readonly data : WorkItemModel | GitCommit,
+        public readonly data : model.WorkItemModel | Commit,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState
     )
     {
         super("", collapsibleState);
-        const isC = "commitId" in data;
-        const id = isC ? (data as GitCommit).commitId : (data as WorkItemModel).id()?.toString();
-        const title = isC ?  (data as GitCommit).comment : (data as WorkItemModel).field("System.Title").toString();
+        const isC = "hash" in data;
+        const id = isC ? (data as Commit).hash : (data as model.WorkItemModel).id()?.toString();
+        const title = isC ?  (data as Commit).message : (data as model.WorkItemModel).field("System.Title").toString();
         this.id=id;
         this.data=data;
-        this.label=`${id?.toString()} - ${title}`;
+        this.label = isC ? `${id?.slice(0,5)}... - ${title}` : `${id} - ${title}`;
         this.contextValue = isC ? "commit" : 'workItem';
     }
 

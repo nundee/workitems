@@ -4,6 +4,7 @@ import * as lim from "azure-devops-node-api/interfaces/LocationsInterfaces";
 import * as vscode from "vscode";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { WorkItem} from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
+import { GitPullRequest, GitVersionDescriptor, GitVersionType } from "azure-devops-node-api/interfaces/GitInterfaces";
 
 interface Config {
     token:string
@@ -12,11 +13,11 @@ interface Config {
 }
 
 function getConfig() : Config {
-    const vsCfg = vscode.workspace.getConfiguration('WorkItems');
+    const vsCfg = vscode.workspace.getConfiguration();
     return {
-        token:vsCfg.get("personalToken","borotgw2dp2y4rvobfxoz7qyqhu76qtlwsyrqfbbyy5wppfazbya"), //"swy7ybwkmypx4mnyces4mt4fh65i6bkzdb2yh2fez3ssbzwzieoq"),
-        organizationUrl : vsCfg.get("organizationUrl","https://tfs.avl.com/Cameo/"),
-        project:vsCfg.get("project","CAMEO3")
+        organizationUrl : vsCfg.get("workItems.organizationUrl","https://tfs.avl.com/Cameo/"),
+        project:vsCfg.get("workItems.project","CAMEO3"),
+        token:vsCfg.get("workItems.personalAccessToken","")
     };
 }
 
@@ -84,7 +85,7 @@ export async function getWorkItemsFromTfs(wiql:string, top?:number) {
         const ids=wiqlResults.map(r=> Number(r.id));
         const fields = ["System.Id", "System.Title"];
         const MAX_ID_LEN=200; 
-        // you can retrieve no more than 200 items at once
+        // you can fetch no more than 200 items at once
         //https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/get-work-items-batch?view=azure-devops-rest-6.0&tabs=HTTP
         let wItems : WorkItem[] = [];
         for (let i = 0; i < ids.length; i+=MAX_ID_LEN) {
@@ -96,4 +97,39 @@ export async function getWorkItemsFromTfs(wiql:string, top?:number) {
         }
         return wItems;
     }
+}
+
+export async function findRepositoryByUrl(url:string) {
+    await ensureApi();
+    const allRepos= await gitApi.getRepositories();
+    return allRepos.find(r=>r.remoteUrl===url);
+}
+
+export async function getCommitsFromTfs(repoId:string, branch:string) {
+    await ensureApi();
+    const searchCriteria = {
+        itemVersion : {
+            version : branch,
+            versionType : GitVersionType.Branch
+        }
+    };
+    const commits=await gitApi.getCommits(repoId,searchCriteria, getConfig().project);
+    return commits;
+}
+
+export async function createPullReq(repoId:string, fromBranch:string, toBranch:string, options:any) {
+    const refs = await gitApi.getRefs(repoId);
+    const fromName=refs.find(r=>r.name ? r.name.indexOf(fromBranch)>=0 : false);
+    const toName=refs.find(r=>r.name ? r.name.indexOf(toBranch)>=0 : false);
+    const pullReq = {
+        sourceRefName:fromName,
+        targetRefName:toName,
+        title : options.title ?? 'no title',
+        workItemRefs : options.workItemRefs ??  [],
+        completionOptions : {
+            deleteSourceBranch:true
+        }
+    } as GitPullRequest;
+    const resp = await gitApi.createPullRequest(pullReq,repoId);
+    return resp;
 }

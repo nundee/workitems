@@ -63,16 +63,36 @@
             "id": "workItems",
             "title": "Work Items",
             "properties": {
+                "workItems.organizationUrl" :{
+                    "type":"string",
+                    "default":"https://tfs.avl.com/Cameo",
+                    "description": "azure devops server address",
+                    "order": 1
+                },
+                "workItems.project" :{
+                    "type":"string",
+                    "default":"CAMEO3",
+                    "description": "Project",
+                    "order": 2
+                },
+                "workItems.personalAccessToken" :{
+                    "type":"string",
+                    "default":"",
+                    "markdownDescription": "The personal access token to login to devops.  See -> [Use personal access tokens](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows) for how to generate one",
+                    "order": 3
+                },
                 "workItems.searchLast" :{
                     "type":"string",
                     "enum": ["created", "changed"],
                     "default":"changed",
-                    "description": "fetch the work items changed the last days"
+                    "description": "Fetch the work items changed the last days",
+                    "order": 4
                 },
                 "workItems.count" :{
                     "type":"number",
                     "default":101,
-                    "description": "how many days back"
+                    "description": "How many days back",
+                    "order": 5
                 }
             }
         }

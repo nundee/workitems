@@ -1,5 +1,6 @@
 out
 dist
 node_modules
+mytoken.txt
 .vscode-test/
 *.vsix
