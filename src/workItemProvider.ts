@@ -5,7 +5,6 @@ import { GitCommit } from "azure-devops-node-api/interfaces/GitInterfaces";
 import * as model from "./model";
 import { Commit } from './@types/git';
 
-
 async function getWorkItemData() : Promise<WorkItemData[]> {
     const state = await model.getState();
     return state.workItems.map(wi=>new WorkItemData(wi,1));
@@ -63,6 +62,21 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
             model.mentionWorkItem(wid);
         }
     }
+
+    checkInWorkItem(item:any) : void {
+        const wid=(item.data as model.WorkItemModel).id();
+        if(wid) {
+            model.checkInWorkItem(wid);
+        }
+    }
+
+    registerAll(context: vscode.ExtensionContext) {
+        context.subscriptions.push(vscode.window.registerTreeDataProvider("workItems",this));
+        context.subscriptions.push(vscode.commands.registerCommand("workItems.refreshEntry",this.refresh,this));
+        context.subscriptions.push(vscode.commands.registerCommand("workItems.showSettings",this.showSettings, this));
+        context.subscriptions.push(vscode.commands.registerCommand("workItems.mentionWorkItem",this.mentionWorkItem,this));
+        context.subscriptions.push(vscode.commands.registerCommand("workItems.checkInWorkItem",this.checkInWorkItem, this));
+    }
 }
 
 export class WorkItemData extends vscode.TreeItem {
@@ -85,3 +99,4 @@ export class WorkItemData extends vscode.TreeItem {
         return this.contextValue==="workItem";
     }
 }
+

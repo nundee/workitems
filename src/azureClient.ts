@@ -4,7 +4,7 @@ import * as lim from "azure-devops-node-api/interfaces/LocationsInterfaces";
 import * as vscode from "vscode";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { WorkItem} from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
-import { GitPullRequest, GitVersionDescriptor, GitVersionType } from "azure-devops-node-api/interfaces/GitInterfaces";
+import { GitCommitRef, GitPullRequest, GitPullRequestMergeStrategy, GitVersionDescriptor, GitVersionType, PullRequestStatus } from "azure-devops-node-api/interfaces/GitInterfaces";
 
 interface Config {
     token:string
@@ -117,19 +117,59 @@ export async function getCommitsFromTfs(repoId:string, branch:string) {
     return commits;
 }
 
-export async function createPullReq(repoId:string, fromBranch:string, toBranch:string, options:any) {
+export async function createPullReq(
+    repoId:string, 
+    fromBranch:string, toBranch:string, 
+    //commits?: GitCommitRef[],
+    commits?:string[],
+    options?:any) 
+{
     const refs = await gitApi.getRefs(repoId);
-    const fromName=refs.find(r=>r.name ? r.name.indexOf(fromBranch)>=0 : false);
-    const toName=refs.find(r=>r.name ? r.name.indexOf(toBranch)>=0 : false);
-    const pullReq = {
-        sourceRefName:fromName,
-        targetRefName:toName,
-        title : options.title ?? 'no title',
-        workItemRefs : options.workItemRefs ??  [],
-        completionOptions : {
-            deleteSourceBranch:true
+    const fromRef=refs.find(r=>r.name ? r.name.endsWith("/"+fromBranch) : false);
+    const toRef=refs.find(r=>r.name ? r.name.endsWith("/"+toBranch) : false);
+    const cherryPickCommits = commits?.map(cid => ({commitId:cid}));
+    try {
+        const pullReq : GitPullRequest = {
+            sourceRefName:fromRef?.name,
+            targetRefName:toRef?.name,
+            commits : cherryPickCommits,
+            title : options?.title ?? 'no title',
+            workItemRefs : options?.workItemRefs ??  [],
+        };
+        let resultPullReq = await gitApi.createPullRequest(pullReq,repoId);
+        if(resultPullReq.pullRequestId && resultPullReq.status===PullRequestStatus.Active) {
+            // set auto complete
+            const autoCompletePullReq : GitPullRequest = {
+                autoCompleteSetBy : resultPullReq.createdBy,
+                completionOptions : {
+                    deleteSourceBranch:true,
+                    bypassPolicy : false
+                }
+            };
+            resultPullReq = await gitApi.updatePullRequest(autoCompletePullReq,repoId,resultPullReq.pullRequestId);
         }
-    } as GitPullRequest;
-    const resp = await gitApi.createPullRequest(pullReq,repoId);
-    return resp;
+        return resultPullReq;
+    } catch (err) {
+        return String(err);
+    }
+
+}
+
+export async function deleteBranch(
+    repoId:string, 
+    branchName:string) 
+{
+    const refs = await gitApi.getRefs(repoId);
+    const branchRef=refs.find(r=>r.name ? r.name.endsWith("/"+branchName) : false);
+    if(branchName) {
+        const resp = await gitApi.updateRefs([{
+            name: branchRef?.name,
+            oldObjectId: branchRef?.objectId,
+            newObjectId: '0000000000000000000000000000000000000000'}
+        ],
+        repoId);
+        if(resp && resp.length>0) {
+            return resp[0];
+        }
+    }
 }

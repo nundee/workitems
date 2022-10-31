@@ -28,6 +28,10 @@
       {
         "command": "workItems.mentionWorkItem",
         "title": "Mention in the next commit"
+      },
+      {
+        "command": "workItems.checkInWorkItem",
+        "title": "Check in"
       }
     ],
     "views": {
@@ -54,6 +58,10 @@
         "view/item/context" : [
             {
                 "command" : "workItems.mentionWorkItem",
+                "when" : "view == workItems && viewItem == workItem"
+            },
+            {
+                "command" : "workItems.checkInWorkItem",
                 "when" : "view == workItems && viewItem == workItem"
             }
         ]

@@ -12,10 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
 	console.log('Congratulations, your extension "workitems" is now active!');
 
     const wiProvider = new WorkItemProvider();
-	context.subscriptions.push(vscode.window.registerTreeDataProvider("workItems",wiProvider));
-	context.subscriptions.push(vscode.commands.registerCommand("workItems.refreshEntry",()=>wiProvider.refresh()));
-	context.subscriptions.push(vscode.commands.registerCommand("workItems.showSettings",()=>wiProvider.showSettings()));
-	context.subscriptions.push(vscode.commands.registerCommand("workItems.mentionWorkItem",x=>wiProvider.mentionWorkItem(x)));
+    wiProvider.registerAll(context);
 }
 
 // This method is called when your extension is deactivated
