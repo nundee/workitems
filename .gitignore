@@ -4,3 +4,4 @@ node_modules
 mytoken.txt
 .vscode-test/
 *.vsix
+*.bak
