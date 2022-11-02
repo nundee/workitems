@@ -117,16 +117,23 @@ export async function getCommitsFromTfs(repoId:string, branch:string) {
     return commits;
 }
 
+export async function getBranchRefs(repoId:string, branchNames : string[]) {
+    const refs = await gitApi.getRefs(repoId);
+    return branchNames.map(bName=>refs.find(r=>r.name ? r.name.endsWith("/"+bName) : false));
+}
+
+export async function getBranchRef(repoId:string, branchName : string) {
+    const [branchRef] = await getBranchRefs(repoId, [branchName]);
+    return branchRef;
+}
+
 export async function createPullReq(
     repoId:string, 
     fromBranch:string, toBranch:string, 
-    //commits?: GitCommitRef[],
     commits?:string[],
     options?:any) 
 {
-    const refs = await gitApi.getRefs(repoId);
-    const fromRef=refs.find(r=>r.name ? r.name.endsWith("/"+fromBranch) : false);
-    const toRef=refs.find(r=>r.name ? r.name.endsWith("/"+toBranch) : false);
+    const [fromRef, toRef] = await getBranchRefs(repoId,[fromBranch,toBranch]);
     const cherryPickCommits = commits?.map(cid => ({commitId:cid}));
     try {
         const pullReq : GitPullRequest = {
@@ -159,8 +166,7 @@ export async function deleteBranch(
     repoId:string, 
     branchName:string) 
 {
-    const refs = await gitApi.getRefs(repoId);
-    const branchRef=refs.find(r=>r.name ? r.name.endsWith("/"+branchName) : false);
+    const branchRef = await getBranchRef(repoId, branchName);
     if(branchName) {
         const resp = await gitApi.updateRefs([{
             name: branchRef?.name,

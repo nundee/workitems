@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as az from './azureClient';
 import { WorkItem } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 import { getGitApi } from "./gitExtension";
-import { Commit } from './@types/git';
+import { Commit, ForcePushMode } from './@types/git';
 import { PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 
 export function isNullOrEmpty(a:any[]):boolean {
@@ -42,13 +42,22 @@ export class WorkItemModel  {
     field(f:string) {
         return this.workItem.fields ? this.workItem.fields[f] : undefined;
     }
+    get title() {
+        return this.field("System.Title").toString();
+    }
+    workItemRef() {
+        return {
+            id  : this.workItem.id,
+            url : this.workItem.url
+        };
+    }
 };
 
 export class State {
     workItems:WorkItemModel[]=[];
     commits:Commit[]=[];
 
-    async refresh() {
+    async refresh(filterText?:string) {
         const vsCfg = vscode.workspace.getConfiguration();
         const cfgField:string = vsCfg.get("workItems.searchLast","changed");
         let col = "[System.ChangedDate]";
@@ -56,14 +65,24 @@ export class State {
             col = "[System.CreatedDate]";
         }
         const count:number = vsCfg.get<number>("workItems.count",10);
-        //const query = `SELECT [System.Id], ${col} FROM WorkItems WHERE ${col} >= @Today-${count} ORDER BY ${col} DESC`;
-        const query = `SELECT [System.Id], ${col} FROM WorkItems WHERE [System.Title] contains words 'Integreater'`;
+        let whereClause:string='';
+        const wiId=Number(filterText);
+        if (isNaN(wiId) || wiId===0) {
+            whereClause = filterText
+                ? `[System.Title] contains words '${filterText}'` 
+                : `${col} >= @Today-${count} ORDER BY ${col} DESC`
+                ;
+        } else {
+            whereClause = `[System.Id] = ${filterText}`;
+        }
+        const query = `SELECT [System.Id], ${col} FROM WorkItems WHERE ${whereClause}`;
+        //const query = `SELECT [System.Id], ${col} FROM WorkItems WHERE [System.Title] contains words 'Integreater'`;
         console.log("fetching work items ...");
         console.log(query);
         const wItems = await az.getWorkItemsFromTfs(query);
         if (!wItems) {return [];}
         this.workItems = (wItems as WorkItem[]).map(wi=>new WorkItemModel(wi));
-        this.refreshCommits();
+        await this.refreshCommits();
     }
 
     async refreshCommits() {
@@ -82,10 +101,13 @@ export class State {
 
 let _state : State | undefined = undefined;
 
-export async function getState() {
+export function getState() {
     if(!_state) {
         _state=new State();
-        await _state.refresh();
+        currentRepo()?.state.onDidChange((e)=>{
+            const repo=currentRepo();
+            console.log(repo?.state.HEAD);
+        });
     }
     return _state;
 }
@@ -103,11 +125,8 @@ function extractWorkItemIdFromComment(comment?:string) {
     return -1;
 }
 
-export async function findCommitsMentionedIn(wiId:number, state?:State) {
-    if(!state) {
-        state=await getState();
-    }
-    return state.commits.filter(commit=>extractWorkItemIdFromComment(commit.message) === wiId);
+export function findCommitsMentionedIn(wiId:number, state?:State) {
+    return getState().commits.filter(commit=>extractWorkItemIdFromComment(commit.message) === wiId);
 }
 
 export function mentionWorkItem(wiId:number) {
@@ -134,13 +153,20 @@ function formatDateTime(dt:Date) {
 ${twoDigits(dt.getHours())}.${twoDigits(dt.getMinutes())}.${twoDigits(dt.getSeconds())}`;
 }
 
-export async function checkInWorkItem(wiId:number) {
+export async function checkInWorkItem(wi:WorkItemModel, report?: (msg:string) => void) {
     const repo=currentRepo();
     if(!repo) {
         return;
     }
+
+    const reportProgress = report 
+    ? ((x:string)=> { report(x); console.log(x);})
+    : ((x:string)=>console.log(x))
+    ;
+
     const currBranchName=currentBranch();
     // . create temporary branch from the current branch
+    const wiId = wi.id() ?? 0;
     const tmpBranchName = `tmp/_tmp_${currBranchName}_${wiId}_${formatDateTime(new Date())}`;
     let localBranchCreated=false;
     let remoteBranchCreated=false;
@@ -150,6 +176,7 @@ export async function checkInWorkItem(wiId:number) {
         vscode.window.showErrorMessage("cannot identify remote");
         return;
     }
+    reportProgress("finding remote "+remoteUrl);
     const repoId = (await az.findRepositoryByUrl(remoteUrl))?.id;
     if(!repoId) {
         vscode.window.showErrorMessage("cannot find remote repository " + remoteName);
@@ -157,18 +184,28 @@ export async function checkInWorkItem(wiId:number) {
     }
     try {
         // . pull
+        reportProgress("pull from origin");
         await repo.pull();
-        let state = await getState();
+        let state = getState();
         await state.refreshCommits();
         // create a temporary branch
+        reportProgress("create temp branch: "+tmpBranchName);
         await repo.createBranch(tmpBranchName,false);
         localBranchCreated=true;
         // . publish the temp branch
+        reportProgress("publish temp branch: "+tmpBranchName);
         await repo.push(remoteName,tmpBranchName);
         remoteBranchCreated=true;
         // . create pull request
+        reportProgress("create pull request");
         const commits = await findCommitsMentionedIn(wiId,state);
-        const response=await az.createPullReq(repoId,tmpBranchName,currBranchName,commits.map(c=>c.hash));
+        const response=await az.createPullReq(repoId,tmpBranchName,currBranchName,
+            commits.map(c=>c.hash),
+            {
+                title:`Check in request for ${wi.title}`,
+                workItemRefs:[wi.workItemRef()]
+            }
+        );
         if(typeof response === 'string') {
             throw response;
         }
@@ -179,12 +216,17 @@ export async function checkInWorkItem(wiId:number) {
     catch(err:any) {
         vscode.window.showErrorMessage(err);
         if(remoteBranchCreated) {
-            await az.deleteBranch(repoId,tmpBranchName);
+            //await az.deleteBranch(repoId,tmpBranchName);
+            const brName = await az.getBranchRef(repoId,tmpBranchName);
+            if(brName) {
+                await repo.push(remoteName,':'+brName?.name,false,ForcePushMode.Force);
+            }
         }
     }
     finally {
         // delete temp branch
         if(localBranchCreated) {
+            reportProgress("delete temp branch: "+tmpBranchName);
             await repo.deleteBranch(tmpBranchName,true);
         }
         //await repo.fetch({prune:true});
