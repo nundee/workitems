@@ -13,10 +13,10 @@ This simple very specialized extension supports working with git repositories in
 
 ### Screenshots
 Mention a work item in the upcoming commit message
-![](pictures/mentionCommit.png)
+![](https://github.com/nundee/workitems/releases/download/v0.1.0/mentionCommit.png)
 
 Check in commits under a work item
-![](pictures/checkIn.png)
+![](https://github.com/nundee/workitems/releases/download/v0.1.0/checkIn.png)
 
 ## Requirements
 
