@@ -3,6 +3,7 @@
 .github
 node_modules
 src/**
+mytoken.txt
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md

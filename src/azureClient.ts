@@ -179,3 +179,8 @@ export async function deleteBranch(
         }
     }
 }
+
+export async function getPullReqStatus(pid:number) {
+    const preq = await gitApi.getPullRequestById(pid);
+    return preq.status;
+}
