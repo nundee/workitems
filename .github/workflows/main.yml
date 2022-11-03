@@ -20,7 +20,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          file: "*.vsix"
+          file: "*.vsix;pictures/*.png"
           tags: true
           draft: false
           prerelease: false

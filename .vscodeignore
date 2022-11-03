@@ -1,8 +1,9 @@
 .vscode/**
 .vscode-test/**
 .github
-node_modules
+node_modules/**
 src/**
+pictures/**
 mytoken.txt
 .gitignore
 .yarnrc
