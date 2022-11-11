@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { WorkItem} from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 import { GitCommitRef, GitPullRequest, GitPullRequestMergeStrategy, GitVersionDescriptor, GitVersionType, PullRequestStatus } from "azure-devops-node-api/interfaces/GitInterfaces";
-
+import * as logger from "./logger";
 interface Config {
     token:string
     organizationUrl:string
@@ -53,15 +53,15 @@ async function getApi() {
             let vsts: az.WebApi = new az.WebApi(cfg.organizationUrl, authHandler, option);
             let connData: lim.ConnectionData = await vsts.connect();
             if(connData.authenticatedUser) {
-                console.log(`Hello ${connData.authenticatedUser.providerDisplayName}`);
+                logger.info(`Hello ${connData.authenticatedUser.providerDisplayName}`);
             }
             return vsts;
         }
         catch (err) {
-            console.error(err);
+            
+            logger.error(err);
             return null;
         }
-    
     }
 
 let webApi: az.WebApi | null = null;
@@ -127,6 +127,8 @@ export async function getBranchRef(repoId:string, branchName : string) {
     return branchRef;
 }
 
+
+
 export async function createPullReq(
     repoId:string, 
     fromBranch:string, toBranch:string, 
@@ -162,6 +164,28 @@ export async function createPullReq(
 
 }
 
+export async function createBranch(
+    repoId:string,
+    fromBranchName:string,
+    newBranchName:string) 
+{
+    const branchRef = await getBranchRef(repoId, fromBranchName);
+    if(branchRef && branchRef.name) {
+        const i=branchRef.name.lastIndexOf('/');
+        const prefix=branchRef.name.slice(0,i+1);
+        const resp = await gitApi.updateRefs([{
+            name: prefix+newBranchName,
+            newObjectId: branchRef?.objectId,
+            oldObjectId: '0000000000000000000000000000000000000000'}
+        ],
+        repoId);
+        if(resp && resp.length>0) {
+            return resp[0];
+        }
+    }
+}
+
+
 export async function deleteBranch(
     repoId:string, 
     branchName:string) 
@@ -184,3 +208,4 @@ export async function getPullReqStatus(pid:number) {
     const preq = await gitApi.getPullRequestById(pid);
     return preq.status;
 }
+

@@ -2,7 +2,7 @@
     "name": "workitems",
     "displayName": "WorkItems",
     "description": "read readme",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "repository": {
         "type": "git",
         "url": "https://github.com/nundee/workitems"
@@ -10,7 +10,7 @@
     "license": "MIT",
     "bugs": {
         "url": "https://github.com/nundee/workitems/issues"
-      },
+    },
     "homepage": "https://github.com/nundee/workitems#readme",
     "engines": {
         "vscode": "^1.72.0"
@@ -38,6 +38,10 @@
                 "command": "workItems.showSettings",
                 "title": "Show Settings",
                 "icon": "$(settings-gear)"
+            },
+            {
+                "command": "workItems.switchToWorkItemBranch",
+                "title": "Switch to work item branch"
             },
             {
                 "command": "workItems.mentionWorkItem",
@@ -76,6 +80,10 @@
             ],
             "view/item/context": [
                 {
+                    "command": "workItems.switchToWorkItemBranch",
+                    "when": "view == workItems && viewItem == workItem"
+                },
+                {
                     "command": "workItems.mentionWorkItem",
                     "when": "view == workItems && viewItem == workItem"
                 },
@@ -108,6 +116,12 @@
                         "markdownDescription": "The personal access token to login to devops.  See -> [Use personal access tokens](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows) for how to generate one",
                         "order": 3
                     },
+                    "workItems.developmentBranch": {
+                        "type": "string",
+                        "default": "development",
+                        "description": "The name of the development branch",
+                        "order": 4
+                    },
                     "workItems.searchLast": {
                         "type": "string",
                         "enum": [
@@ -116,13 +130,13 @@
                         ],
                         "default": "changed",
                         "description": "Fetch the work items changed the last days",
-                        "order": 4
+                        "order": 5
                     },
                     "workItems.count": {
                         "type": "number",
                         "default": 101,
                         "description": "How many days back",
-                        "order": 5
+                        "order": 6
                     }
                 }
             }
@@ -153,6 +167,7 @@
         "eslint": "^8.26.0",
         "glob": "^8.0.3",
         "mocha": "^10.1.0",
+        "ts-node": "^10.9.1",
         "typescript": "^4.8.4",
         "vsce": "^2.13.0"
     },

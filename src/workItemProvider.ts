@@ -63,7 +63,16 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
         await vscode.commands.executeCommand("workbench.action.openSettings", "workItems");
     }
 
-    mentionWorkItem(item: any): void {
+    async switchToWIBranch(item:any) {
+        const wi = item.data as model.WorkItemModel;
+        if (wi) {
+            if (await model.getState().checkoutWorkItemBranch(wi)) {
+                this.refresh();
+            }
+        }
+    }
+
+    mentionWorkItem(item: any) {
         const wid = (item.data as model.WorkItemModel).id();
         if (wid) {
             model.mentionWorkItem(wid);
@@ -81,8 +90,8 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
             async (progress) => {
                 const req = await model.getState().checkInWorkItem(wim, (message: string) => { progress.report({ message }); });
                 if (req) {
-                    if (typeof req === 'string') {
-                        vscode.window.showErrorMessage(req);
+                    if ("message" in req) {
+                        vscode.window.showErrorMessage(req.message);
                     } else {
                         return req as GitPullRequest;
                     }
@@ -107,6 +116,7 @@ export class WorkItemProvider implements vscode.TreeDataProvider<WorkItemData> {
         context.subscriptions.push(vscode.commands.registerCommand("workItems.refreshEntry", this.refresh, this));
         context.subscriptions.push(vscode.commands.registerCommand("workItems.filterEntry", this.setFilter, this));
         context.subscriptions.push(vscode.commands.registerCommand("workItems.showSettings", this.showSettings, this));
+        context.subscriptions.push(vscode.commands.registerCommand("workItems.switchToWorkItemBranch", this.switchToWIBranch, this));
         context.subscriptions.push(vscode.commands.registerCommand("workItems.mentionWorkItem", this.mentionWorkItem, this));
         context.subscriptions.push(vscode.commands.registerCommand("workItems.checkInWorkItem", this.checkInWorkItem, this));
 
