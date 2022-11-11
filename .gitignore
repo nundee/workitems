@@ -2,6 +2,7 @@ out
 dist
 node_modules
 mytoken.txt
+*.ps1
 .vscode-test/
 *.vsix
 *.bak
